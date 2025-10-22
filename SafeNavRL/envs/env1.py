@@ -1,5 +1,5 @@
 import safety_gymnasium
-from baseenv import BaseEnv
+from .baseenv import BaseEnv
 
 class Env1(BaseEnv):
     
@@ -28,4 +28,3 @@ class Env1(BaseEnv):
         self.env.close()
 
 
-env=Env1()
