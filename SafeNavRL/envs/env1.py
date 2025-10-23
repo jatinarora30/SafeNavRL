@@ -18,7 +18,8 @@ class Env1(BaseEnv):
 
     def step(self, action):
         obs, reward, cost, terminated, truncated, info = self.env.step(action)
-        return obs, reward, cost, terminated, truncated, info
+        done = truncated or terminated
+        return obs, reward, cost, done
 
     def reset(self):
         obs, info = self.env.reset()

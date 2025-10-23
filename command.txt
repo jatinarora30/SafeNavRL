@@ -1,1 +1,1 @@
-python3 main.py --episodes 100 --type train --env Env1 --algo PPO --continue_run True
+python3 main.py --episodes 100 --type train --env Env1 --algo PPO --continue_run 

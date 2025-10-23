@@ -5,12 +5,17 @@ import matplotlib.pyplot as plt
 
 
 class Visualize:
-    def __init__(self, log_root="logs", results_dir="results"):
-        self.log_root = log_root
-        self.results_dir = results_dir
+    def __init__(self):
+      
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, "..", ".."))
+
+        self.log_root = os.path.join(project_root, "logs")
+        self.results_dir = os.path.join(project_root, "results")
+
         os.makedirs(self.results_dir, exist_ok=True)
 
-        # Simple plotting style (similar to your image)
+      
         plt.rcParams.update({
             "axes.spines.top": False,
             "axes.spines.right": False,
@@ -20,33 +25,44 @@ class Visualize:
             "lines.linewidth": 2,
         })
 
+  
+
     def collect_data(self):
-        """Collect all environment–algorithm CSV file paths."""
+        """Collect all train/test CSV files under each environment and algorithm."""
         data = {}
         if not os.path.exists(self.log_root):
             print(f"Log directory '{self.log_root}' not found.")
             return data
 
-        for env in os.listdir(self.log_root):
-            env_path = os.path.join(self.log_root, env)
-            if not os.path.isdir(env_path):
+        for mode in ["train", "test"]:
+            mode_path = os.path.join(self.log_root, mode)
+            if not os.path.isdir(mode_path):
                 continue
-            data[env] = {}
-            for algo in os.listdir(env_path):
-                algo_path = os.path.join(env_path, algo)
-                if not os.path.isdir(algo_path):
+
+            for env in os.listdir(mode_path):
+                env_path = os.path.join(mode_path, env)
+                if not os.path.isdir(env_path):
                     continue
-                csv_files = [
-                    os.path.join(algo_path, f)
-                    for f in os.listdir(algo_path)
-                    if f.endswith(".csv")
-                ]
-                if csv_files:
-                    data[env][algo] = csv_files
+                data.setdefault(env, {}).setdefault(mode, {})
+
+                for algo in os.listdir(env_path):
+                    algo_path = os.path.join(env_path, algo)
+                    if not os.path.isdir(algo_path):
+                        continue
+
+                    csv_files = [
+                        os.path.join(algo_path, f)
+                        for f in os.listdir(algo_path)
+                        if f.endswith(".csv")
+                    ]
+                    if csv_files:
+                        data[env][mode][algo] = csv_files
         return data
 
+   
+
     def _load_runs(self, csv_files):
-        """Load CSV runs, align by episode, and return mean/std arrays."""
+        """Load multiple CSV runs and return averaged statistics."""
         dfs = []
         for f in csv_files:
             try:
@@ -70,15 +86,23 @@ class Visualize:
             "reward_std": rewards.std(axis=0),
             "cost_mean": costs.mean(axis=0),
             "cost_std": costs.std(axis=0),
+            "reward_final_mean": rewards[:, -1].mean(),
+            "reward_final_std": rewards[:, -1].std(),
+            "cost_final_mean": costs[:, -1].mean(),
+            "cost_final_std": costs[:, -1].std(),
         }
         return stats
 
-    def plot_env(self, env, algo_data):
-        """Generate reward and cost plots for a given environment."""
+
+
+    def plot_env_mode(self, env, mode, algo_data):
+        """Plot reward and cost for one environment in a given mode (train/test)."""
         save_dir = os.path.join(self.results_dir, env)
         os.makedirs(save_dir, exist_ok=True)
 
-        # ---- REWARD PLOT ----
+        summary_data = []
+
+        # ---- REWARD ----
         plt.figure()
         for algo, csv_files in algo_data.items():
             stats = self._load_runs(csv_files)
@@ -91,14 +115,24 @@ class Visualize:
                 stats["reward_mean"] + stats["reward_std"],
                 alpha=0.2,
             )
+            summary_data.append({
+                "Mode": mode,
+                "Algo": algo,
+                "Reward Mean": stats["reward_final_mean"],
+                "Reward Std": stats["reward_final_std"],
+                "Cost Mean": stats["cost_final_mean"],
+                "Cost Std": stats["cost_final_std"],
+            })
+
         plt.xlabel("Episode")
         plt.ylabel("Reward")
+        plt.title(f"{env} ({mode.upper()}) - Reward")
         plt.legend(frameon=False)
         plt.tight_layout()
-        plt.savefig(os.path.join(save_dir, f"{env}_reward.png"))
+        plt.savefig(os.path.join(save_dir, f"{mode}_reward.png"))
         plt.close()
 
-        # ---- COST PLOT ----
+    
         plt.figure()
         for algo, csv_files in algo_data.items():
             stats = self._load_runs(csv_files)
@@ -113,26 +147,33 @@ class Visualize:
             )
         plt.xlabel("Episode")
         plt.ylabel("Cost")
+        plt.title(f"{env} ({mode.upper()}) - Cost")
         plt.legend(frameon=False)
         plt.tight_layout()
-        plt.savefig(os.path.join(save_dir, f"{env}_cost.png"))
+        plt.savefig(os.path.join(save_dir, f"{mode}_cost.png"))
         plt.close()
 
-  
+        # ---- PRINT MEAN/STDEV SUMMARY ----
+        if summary_data:
+            df_summary = pd.DataFrame(summary_data)
+            print(f"\nSummary for {env} ({mode.upper()}):")
+            print(df_summary.to_string(index=False))
+
 
     def plot_all(self):
-        """Scan all envs and plot rewards and costs."""
+        """Scan all environments, plot train/test results if available."""
         all_data = self.collect_data()
         if not all_data:
             print("No logs found.")
             return
 
-        for env, algo_data in all_data.items():
-            if algo_data:
-                self.plot_env(env, algo_data)
+        for env, modes in all_data.items():
+            for mode, algo_data in modes.items():
+                if algo_data:
+                    self.plot_env_mode(env, mode, algo_data)
 
 
-# # === Example ===
-# if __name__ == "__main__":
-#     vis = Visualize(log_root="logs", results_dir="results")
-#     vis.plot_all()
+
+if __name__ == "__main__":
+    vis = Visualize()
+    vis.plot_all()

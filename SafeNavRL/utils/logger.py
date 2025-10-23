@@ -2,17 +2,23 @@ import os
 import csv
 
 class Logger:
-    def __init__(self, env, algo, continueRun=False):
+    def __init__(self, env, algo, type, continueRun=False):
+        
         self.createDir("logs")
-        self.envPath = os.path.join("logs", env)
+        self.type = type
+        self.typePath = os.path.join("logs", self.type)
+        self.envPath = os.path.join(self.typePath, env)
         self.algoPath = os.path.join(self.envPath, algo)
+        self.createDir(self.typePath)
         self.createDir(self.envPath)
         self.createDir(self.algoPath)
 
+        # Get existing CSV files for this algorithm
         self.fileList = [f for f in os.listdir(self.algoPath) if f.endswith(".csv")]
         self.lastRun = len(self.fileList)
 
         if continueRun and self.lastRun > 0:
+            # Continue from last file
             self.run_id = self.lastRun
             self.csv_path = os.path.join(self.algoPath, f"{algo}_run{self.run_id}.csv")
             if os.path.exists(self.csv_path):
@@ -23,7 +29,7 @@ class Logger:
                 self.episode = 0
                 self._create_csv()
         else:
-            
+            # Start a new run file
             self.run_id = self.lastRun + 1
             self.csv_path = os.path.join(self.algoPath, f"{algo}_run{self.run_id}.csv")
             self._create_csv()
@@ -52,15 +58,4 @@ class Logger:
         with open(self.csv_path, mode="a", newline="") as file:
             writer = csv.writer(file)
             writer.writerow([current_episode, reward, cost])
-        print(f"[{self.name}] Episode {current_episode}: Reward={reward:.3f}, Cost={cost:.3f}")
 
-    def next_episode(self):
-        """Increment the episode counter (optional helper)."""
-        self.episode += 1
-
-
-# # Example usage:
-# if __name__ == "__main__":
-#     log = Logger("HopperBulletEnv-v1", "APPO", continueRun=False)
-#     for ep in range(10):
-#         log.log(ep, reward=34 - ep, cost=ep * 0.1)
